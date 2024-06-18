@@ -1,0 +1,4 @@
+epoch, state, cogni, num_in, num_out, num_con, generosity, spawn_investment, connection_willingness, received_rewards, maintenance, births, deaths, population_size, 
+0, 0.0, 500.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1, 0, 1, 
+1, 0.0, 500.0, 0.0, 0.0, 0.0, 0.019353209805438438, 76.5, 5.5, 0.0, 0.0, 0, 0, 1, 
+2, 2.5, 498.79289321881345, 0.0, 0.0, 0.0, 0.02106176792125331, 170.5, 6.5, 0.0, 0.5, 0, 0, 1, 
