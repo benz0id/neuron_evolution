@@ -1,8 +1,11 @@
+from multiprocessing import Pool
 from pathlib import Path
 
 import neat
+import src
 
 from src.analysis.analysis_manager import NeuronAnalysisManager
+from src.analysis.timer import PipelineTimer
 from src.managers.epoch_counter import EpochCounter
 from src.entities.neuron import CortexNode, Neuron
 from src.entities.neuron_genome import NeuronGenome
@@ -21,13 +24,7 @@ from src.presenters.matrix_presenter import MatrixPresenter
 SPAWN_RADIUS = 10
 PARTNER_SEARCH_RADIUS = 16
 BREEDING_THRESHOLD = 450
-BASE_COGNI = 1000
-
-# Population Params
-MIN_POPULATION = 2
-TARGET_POPULATION = 100
-MAX_TO_ADD = 1
-STARTING_POPULATION_SIZE = 5
+BASE_COGNI = 100
 
 # Cortex params.
 DIMS = [64, 32]
@@ -52,6 +49,7 @@ STATE_COST = 10
 MOVEMENT_COST = 1
 
 # Display Params
+MATRIX_DISPLAY = False
 WIDTH = 64
 HEIGHT = 32
 UP_EVERY = 10
@@ -62,22 +60,41 @@ VERBOSE = False
 PORT = '/dev/tty.usbmodem101'
 
 # Simulation meta params
-SIMULATION_OUT_DIR = Path('simulation/cache/sim_stats')
-FIGURES_OUT_DIR = Path('simulation/cache/figures')
-MAX_NUM_EPOCHS = 100
+SIMULATION_OUT_DIR = Path('simulation/data/sim_stats')
+FIGURES_OUT_DIR = Path('simulation/data/figures')
+TIMING_OUT_DIR = Path('simulation/data/timing')
+MAX_NUM_EPOCHS = 10000
+SPECIATE_EVERY = 100
 
 
-def get_managers(matrix_presenter: bool = True) -> ManagerSet:
-    config_path = Path('config')
+# Population Params
+MIN_POPULATION = 10000
+TARGET_POPULATION = 10000
+MAX_TO_ADD = 10000
+STARTING_POPULATION_SIZE = 10000
 
-    config = neat.Config(NeuronGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
-                         config_path)
+# Timing args.
+DO_TIMING = True
+PRINT_TIMES = True
+
+# Other
+NUM_CORES = 8
+
+# Config
+config_path = Path('config')
+config = neat.Config(NeuronGenome, neat.DefaultReproduction,
+                     neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                     config_path)
+src.managers.neat_manager.CONFIG = config
+
+def get_managers() -> ManagerSet:
 
     nodes = NodeManager()
 
+    pool = Pool(NUM_CORES)
+
     pres = []
-    if matrix_presenter:
+    if MATRIX_DISPLAY:
         presenter = MatrixPresenter(
             WIDTH,
             HEIGHT,
@@ -91,8 +108,16 @@ def get_managers(matrix_presenter: bool = True) -> ManagerSet:
         pres.append(presenter)
 
     epoch_counter = EpochCounter(pres, MAX_NUM_EPOCHS)
-    genome_manager = NeatPopulationManager(config, nodes.get_all(Neuron))
+    genome_manager = NeatPopulationManager(nodes.get_all(Neuron),
+                                           epoch_counter.get_epoch,
+                                           pool,
+                                           speciate_every=SPECIATE_EVERY,)
     nodes.add_manager(genome_manager)
+
+    action_timer = PipelineTimer(TIMING_OUT_DIR, 'action',
+                                 epoch_counter.get_epoch, PRINT_TIMES, DO_TIMING)
+    update_timer = PipelineTimer(TIMING_OUT_DIR, 'update',
+                                 epoch_counter.get_epoch, PRINT_TIMES, DO_TIMING)
 
     cortex = CortexManager(
         DIMS,
@@ -151,7 +176,7 @@ def get_managers(matrix_presenter: bool = True) -> ManagerSet:
         FIGURES_OUT_DIR,
         epoch_counter.get_epoch,
         nodes.get_all(Neuron),
-        genome_manager.get_species_dict()
+        genome_manager
     )
 
     return ManagerSet(
@@ -163,5 +188,7 @@ def get_managers(matrix_presenter: bool = True) -> ManagerSet:
         connections=connections,
         firing=firing,
         costs=costs,
-        analysis=analysis
+        analysis=analysis,
+        action_timer=action_timer,
+        update_timer=update_timer
     )

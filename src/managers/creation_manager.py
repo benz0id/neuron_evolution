@@ -78,7 +78,10 @@ class NeuronCreationManager(PresenterSubject, Manager):
         cogni = self.starting_cogni
         if coords is None:
             coords = self.cortex.get_random_coords()
-        return self.build_child(genome, cogni, coords, random_shift)
+        child = self.build_child(genome, cogni, coords, random_shift)
+        self.neat.force_assign_next_species(child)
+
+        return child
 
     def spawn_neurons(self, n: int):
         return [self.spawn_neuron() for _ in range(n)]

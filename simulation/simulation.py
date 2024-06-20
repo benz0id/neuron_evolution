@@ -1,27 +1,35 @@
+from multiprocessing import freeze_support
 from time import sleep
-
+from timeit import default_timer as timer
 from simulation_fixtures import get_managers
-from src.coordinators.action_phase import ActionPhase
-from src.coordinators.setup_phase import SetupPhase
+from src.controllers.phase_coordinator import PhaseController
 
 
 def main():
 
     managers = get_managers()
-    action_phase = ActionPhase(managers)
-    setup_phase = SetupPhase(managers)
+    controller = PhaseController(managers)
+    controller.run_setup()
 
-    setup_phase.run_setup()
-    while True:
-        action_phase.run_action_phase()
-        action_phase.run_update()
+    terminated = False
+    last = timer()
+
+    while not terminated:
+        controller.run_action_phase()
 
         epoch = managers.epoch_counter.get_epoch()
         neuron_count = managers.nodes.get_neuron_count()
-        print(f'Epoch \t #{epoch}\t{neuron_count}')
+        now = timer()
+        time = now - last
+        last = now
+        print(f'Epoch \t #{epoch}\t{neuron_count}\t{time:.2f}s')
+
+        terminated = not controller.run_update()
 
 
-main()
+if __name__ == '__main__':
+    freeze_support()
+    main()
 
 
 

@@ -23,7 +23,7 @@ class EpochCounter(PresenterSubject):
         self.update('epoch', None)
         self.i += 1
         if self._termination_epoch is not None and \
-            self.i > self._termination_epoch:
+            self.i >= self._termination_epoch:
             raise EndOfSimulation(self.i)
 
 

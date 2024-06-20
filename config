@@ -5,17 +5,17 @@ pop_size              = 2000
 reset_on_extinction   = 0
 
 [NeuronGenome]
-num_inputs              = 3
-num_hidden              = 1
-num_outputs             = 1
+num_inputs              = 14
+num_hidden              = 10
+num_outputs             = 11
 initial_connection      = partial_nodirect 0.5
 feed_forward            = False
 compatibility_disjoint_coefficient    = 1.0
 compatibility_weight_coefficient      = 0.6
-conn_add_prob           = 0.2
-conn_delete_prob        = 0.2
-node_add_prob           = 0.2
-node_delete_prob        = 0.2
+conn_add_prob           = 0.3
+conn_delete_prob        = 0.3
+node_add_prob           = 0.3
+node_delete_prob        = 0.3
 activation_default      = sigmoid
 activation_options      = sigmoid
 activation_mutate_rate  = 0.0

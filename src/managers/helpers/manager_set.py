@@ -1,4 +1,5 @@
 from src.analysis.analysis_manager import NeuronAnalysisManager
+from src.analysis.timer import PipelineTimer
 from src.managers.epoch_counter import EpochCounter
 from src.managers.cofiring_manager import CofiringManager
 from src.managers.cogni_cost import CogniCostManager
@@ -24,7 +25,8 @@ class ManagerSet:
                  genome_manager: NeatPopulationManager, cortex: CortexManager,
                  creator: NeuronCreationManager, connections: ConnectionManager,
                  firing: CofiringManager, costs: CogniCostManager,
-                 analysis: NeuronAnalysisManager):
+                 analysis: NeuronAnalysisManager, action_timer: PipelineTimer,
+                 update_timer: PipelineTimer):
         self.nodes = nodes
         self.epoch_counter = epoch_counter
         self.genomes = genome_manager
@@ -34,3 +36,5 @@ class ManagerSet:
         self.firing = firing
         self.costs = costs
         self.analysis = analysis
+        self.action_timer = action_timer
+        self.update_timer = update_timer

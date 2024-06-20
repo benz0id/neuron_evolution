@@ -2,13 +2,18 @@ from abc import ABC
 from pathlib import Path
 from typing import List, Dict, Callable, Tuple, Any
 
+from src.analysis.helpers import append_csv_line, get_date_time_filename
 from src.analysis.plotting import ridge_plot
+from src.analysis.vis_net import draw_net
 from src.entities.neuron import Neuron
+from src.entities.neuron_genome import NeuronGenome
 from src.entities.node import Node
 from src.entities.node_list import NodeList
 from src.managers.manager import Manager
 from datetime import datetime
 import os
+
+from src.managers.neat_manager import NeatPopulationManager
 
 
 class Neurons:
@@ -28,6 +33,8 @@ class NeuronAnalysisManager:
 
     _population_cache: Dict[str, int]
     _birth_cache: Dict[str, int]
+
+    _get_representatives: Callable[[], Dict[int, NeuronGenome]]
 
     figure_out_dir: Path
 
@@ -85,22 +92,21 @@ class NeuronAnalysisManager:
                  figure_out_dir: Path,
                  get_epoch: Callable[[], int],
                  neurons: NodeList[Neuron],
-                 species_to_neurons: Dict[int, List[Neuron]]):
+                 genome_manager: NeatPopulationManager):
 
         self._get_epoch = get_epoch
         self._neurons = neurons
-        self._species_to_neurons = species_to_neurons
+        self._species_to_neurons = genome_manager.get_species_dict()
         self._species_to_deaths = {}
         self._species_to_births = {}
+        self._get_representatives = genome_manager.get_representatives
+        self.genome_manager = genome_manager
 
         self._population_cache = {}
         self._birth_cache = {}
-        now = datetime.now()
-        formatted_date_time = now.strftime("%Y-%m-%d-%H-%M-%S")
+        formatted_date_time = get_date_time_filename()
         self.data_out_dir = data_out_dir / formatted_date_time
         self.figure_out_dir = figure_out_dir / formatted_date_time
-        os.mkdir(self.data_out_dir)
-        os.mkdir(self.figure_out_dir)
 
     def _get_pops(self) -> List[Tuple[str, List[Neuron]]]:
         pops = []
@@ -119,13 +125,10 @@ class NeuronAnalysisManager:
             header.append(attr)
         return header
 
-    def _append_csv_line(self, filepath: Path, line: List[Any]):
-        with open(filepath, 'a') as outfile:
-            line = [str(e) for e in line]
-            s = ', '.join(line + ['\n'])
-            outfile.write(s)
-
     def store_simulation_stats(self) -> None:
+        if not self.data_out_dir.exists():
+            os.mkdir(self.data_out_dir)
+
         pops = self._get_pops()
 
         for pop_name, pop in pops:
@@ -144,12 +147,31 @@ class NeuronAnalysisManager:
             outfile = self.data_out_dir / (pop_name + '.csv')
 
             if not outfile.exists():
-                self._append_csv_line(outfile, self._get_header())
-            self._append_csv_line(outfile, to_write)
+                append_csv_line(outfile, self._get_header())
+            append_csv_line(outfile, to_write)
+
+    def generate_species_figures(self):
+        genomes = self.genome_manager.get_representatives()
+        fig_out = self.figure_out_dir / 'representatives'
+        if not fig_out.exists():
+            os.mkdir(fig_out)
+        for species, genome in genomes.items():
+            outfile = fig_out / f'{species}.svg'
+            draw_net(self.genome_manager.config, genome, filename=outfile)
 
     def compile_figures(self):
+        if not self.figure_out_dir.exists():
+            os.mkdir(self.figure_out_dir)
+
+        self.generate_species_figures()
+
         for pop_name, pop in self._get_pops():
+            fig_out = self.figure_out_dir / 'attributes'
+            if not fig_out.exists():
+                os.mkdir(fig_out)
+
             outfile = self.data_out_dir / (pop_name + '.csv')
-            figure_out = self.figure_out_dir / (pop_name + '.jpg')
+            figure_out = fig_out / (pop_name + '.jpg')
             ridge_plot(outfile, figure_out)
+
 

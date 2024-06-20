@@ -117,10 +117,16 @@ class Neuron(CortexNode):
 
     _candidate_record: Union[CofireRecord, None]
 
+    surroundings: np.array
+    neuron_dist: int
+
     def __init__(self, genome: NeuronGenome, starting_coords: Coords,
                  creation_epoch: int, cogni: float, node_id: int,
                  hidden_state_len: int = 4):
         super().__init__(creation_epoch, node_id)
+
+        self.surroundings = []
+        self.neuron_dist = -1
 
         self._genome = genome
         self._genome.set_fitness_method(self.get_cogni)
@@ -132,7 +138,7 @@ class Neuron(CortexNode):
             coords=starting_coords
         )
         self._next_attrs = deepcopy(self._attrs)
-        self._actions = Actions(0, 0, 0, 0, 0, 0, 0, 0)
+        self._actions = Actions(0, 0, 0, 0, 0, np.zeros(hidden_state_len), 0, 0)
 
         self._willing = False
 
@@ -141,6 +147,15 @@ class Neuron(CortexNode):
 
     def get_translation(self) -> np.array:
         return self._actions.translation
+
+    def get_hidden(self) -> np.array:
+        return self._attrs.hidden_state
+
+    def set_hidden(self, hidden: np.array):
+        self._next_attrs.hidden_state = hidden
+
+    def set_state(self, state: float):
+        self._next_attrs.state = state
 
     def get_genome_id(self) -> int:
         return self._genome.id
@@ -251,6 +266,8 @@ class Neuron(CortexNode):
         return copy(self._attrs.inputs)
 
     def get_state(self) -> float:
+        if isinstance(self, NeuronGenome):
+            pass
         return self._attrs.state
 
     def is_excited(self) -> bool:
@@ -283,6 +300,16 @@ class Neuron(CortexNode):
         # Node does not exist on cortex.
         else:
             return None
+
+    def get_surroundings(self) -> np.array:
+        return self.surroundings
+
+    def get_neuron_dist(self) -> int:
+        return self.neuron_dist
+
+    def set_surroundings(self, surroundings: List[float | int]) -> None:
+        self.surroundings = np.array(surroundings[:-1])
+        self.neuron_dist = int(surroundings[-1])
 
     def get_maintenance_value(self):
         return self._actions.maintenance_value

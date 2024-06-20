@@ -47,14 +47,19 @@ class CortexManager(Manager, PresenterSubject):
 
     euclidian_scaling_factor: float
 
+    do_sector_distance_scaling: bool
+
     _tree: NodeSearchTree
     _tree_current: bool
 
     node_proximity_barrier: float
 
-    def __init__(self, shape: List[int], sector_size: int,
-                 nodes: NodeList[CortexNode], presenters: List[Presenter],
+    def __init__(self, shape: List[int],
+                 sector_size: int,
+                 nodes: NodeList[CortexNode],
+                 presenters: List[Presenter],
                  node_proximity_barrier: float = 0,
+                 do_sector_distance_scaling: bool = True
                  ) -> None:
         """
         Initializes a cortex with the given parameters.
@@ -63,6 +68,7 @@ class CortexManager(Manager, PresenterSubject):
         """
         PresenterSubject.__init__(self, presenters)
         Manager.__init__(self, CortexNode)
+        self.do_sector_distance_scaling = do_sector_distance_scaling
         self.presenters = presenters
         self.shape = shape
         self.sector_size = sector_size
@@ -102,8 +108,15 @@ class CortexManager(Manager, PresenterSubject):
             self.refresh_tree()
 
     def refresh_tree(self) -> None:
+        if len(self.nodes) <= 2:
+            return
+
         self._tree = NodeSearchTree(self.nodes)
         self._tree_current = True
+
+    def refresh_sectors(self) -> None:
+        for i in range(len(self.sector_surroundings)):
+            self.sector_surroundings[i] = []
 
     def get_random_coords(self) -> Coords:
         coords = []
@@ -224,8 +237,10 @@ class CortexManager(Manager, PresenterSubject):
 
             # Scale contribution to directional signal by euclidian
             # distance from the axial center.
-            # TODO REVERT
-            contribution = sector_density # / (abs_dist + 1)
+            if self.do_sector_distance_scaling:
+                contribution = sector_density / (abs_dist + 1)
+            else:
+                contribution = sector_density
             total_signal += contribution
         return total_signal
 

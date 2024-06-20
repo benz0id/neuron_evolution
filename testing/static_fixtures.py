@@ -1,17 +1,18 @@
 from pathlib import Path
 
 import neat
-from entities.counter import EpochCounter
-from entities.neuron import CortexNode, Neuron
-from entities.neuron_genome import NeuronGenome
-from managers.cofiring_manager import CofiringManager
-from managers.cogni_cost import CogniCostManager
-from managers.connection_manager import ConnectionManager
-from managers.cortex_manager import CortexManager
-from managers.helpers.manager_set import ManagerSet
-from managers.neat_manager import NeatPopulationManager
-from managers.node_manager import NodeManager
+from src.managers.epoch_counter import EpochCounter
+from src.entities.neuron import CortexNode, Neuron
+from src.entities.neuron_genome import NeuronGenome
+from src.managers.cofiring_manager import CofiringManager
+from src.managers.cogni_cost import CogniCostManager
+from src.managers.connection_manager import ConnectionManager
+from src.managers.cortex_manager import CortexManager
+from src.managers.helpers.manager_set import ManagerSet
+from src.managers.neat_manager import NeatPopulationManager
+from src.managers.node_manager import NodeManager
 
+from src.analysis.analysis_manager import NeuronAnalysisManager
 from src.managers.creation_manager import NeuronCreationManager
 from src.presenters.matrix_presenter import MatrixPresenter
 
@@ -50,11 +51,24 @@ FPS = 20
 PALETTE = 255
 NUM_RESERVED = 9
 VERBOSE = False
+PORT = '/dev/tty.usbmodem101'
+
+# Population Params
+MIN_POPULATION = 2
+TARGET_POPULATION = 100
+MAX_TO_ADD = 1
+STARTING_POPULATION_SIZE = 5
+
+
+# Simulation meta params
+SIMULATION_OUT_DIR = Path('simulation/cache/sim_stats')
+FIGURES_OUT_DIR = Path('simulation/cache/figures')
+MAX_NUM_EPOCHS = 100
 
 
 
 def get_managers(matrix_presenter: bool = True) -> ManagerSet:
-    config_path = Path('../config')
+    config_path = Path('config')
 
     config = neat.Config(NeuronGenome, neat.DefaultReproduction,
                          neat.DefaultSpeciesSet, neat.DefaultStagnation,
@@ -64,20 +78,20 @@ def get_managers(matrix_presenter: bool = True) -> ManagerSet:
 
     pres = []
     if matrix_presenter:
-        pres.append(MatrixPresenter(
+        presenter = MatrixPresenter(
             WIDTH,
             HEIGHT,
-            nodes.get_all(CortexNode),
             UP_EVERY,
             FPS,
             PALETTE,
             NUM_RESERVED,
             VERBOSE,
-            '/dev/tty.usbmodem1101'
-        ))
+            PORT
+        )
+        pres.append(presenter)
 
-    epoch_counter = EpochCounter(pres)
-    genome_manager = NeatPopulationManager(config)
+    epoch_counter = EpochCounter(pres, MAX_NUM_EPOCHS)
+    genome_manager = NeatPopulationManager(config, nodes.get_all(Neuron))
     nodes.add_manager(genome_manager)
 
     cortex = CortexManager(
@@ -91,7 +105,7 @@ def get_managers(matrix_presenter: bool = True) -> ManagerSet:
     creator = NeuronCreationManager(
         PARTNER_SEARCH_RADIUS,
         genome_manager,
-        epoch_counter._get_epoch,
+        epoch_counter.get_epoch,
         nodes.get_next_id,
         nodes.add_node,
         SPAWN_RADIUS,
@@ -99,7 +113,11 @@ def get_managers(matrix_presenter: bool = True) -> ManagerSet:
         BASE_COGNI,
         nodes.get_all(Neuron),
         pres,
-        BREEDING_THRESHOLD
+        breeding_threshold=BREEDING_THRESHOLD,
+        starting_population_size=STARTING_POPULATION_SIZE,
+        target_population_size=TARGET_POPULATION,
+        max_to_add=MAX_TO_ADD,
+        minimum_population_size=MIN_POPULATION
     )
 
     connections = ConnectionManager(
@@ -109,12 +127,13 @@ def get_managers(matrix_presenter: bool = True) -> ManagerSet:
         DIVIDEND_SCALING_FACTOR,
         cortex,
         WILLINGNESS_THRESHOLD,
-        pres
+        pres,
+        nodes.get_all(Neuron)
     )
 
     firing = CofiringManager(
         NEURON_FIRING_MEMORY,
-        epoch_counter._get_epoch,
+        epoch_counter.get_epoch,
         pres
     )
 
@@ -127,6 +146,14 @@ def get_managers(matrix_presenter: bool = True) -> ManagerSet:
         MOVEMENT_COST
     )
 
+    analysis = NeuronAnalysisManager(
+        SIMULATION_OUT_DIR,
+        FIGURES_OUT_DIR,
+        epoch_counter.get_epoch,
+        nodes.get_all(Neuron),
+        genome_manager.get_species_dict()
+    )
+
     return ManagerSet(
         nodes=nodes,
         epoch_counter=epoch_counter,
@@ -135,5 +162,6 @@ def get_managers(matrix_presenter: bool = True) -> ManagerSet:
         creator=creator,
         connections=connections,
         firing=firing,
-        costs=costs
+        costs=costs,
+        analysis=analysis
     )

@@ -1,6 +1,6 @@
 from time import sleep
 
-from src.coordinators.action_phase import ActionPhase
+from src.coordinators.phase_coordinator import ActionPhase
 from testing.static_fixtures import get_managers
 
 

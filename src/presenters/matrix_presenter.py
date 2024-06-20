@@ -57,10 +57,10 @@ class Presenter(Manager):
                              f'received {type(node)}')
         
         if isinstance(node, Neuron):
-            feature = MatrixFeature(coords=copy(node.get_coords()),
-                                    next_coords=copy(node.get_next_coords()),
+            feature = MatrixFeature(coords=node.get_coords().astype(int),
+                                    next_coords=node.get_next_coords().astype(int),
                                     id=node.get_id(),
-                                    group=node.get_species_id(),
+                                    group=10, # TODO REVERT node.get_species_id(),
                                     entity_type=Neuron)
             fid = feature.id
             while fid >= len(self.feature_cache):

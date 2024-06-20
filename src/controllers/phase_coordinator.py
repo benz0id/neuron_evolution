@@ -1,10 +1,16 @@
+from time import sleep
+
+from src.analysis.timer import PipelineTimer
 from src.entities.neuron import Neuron
 from src.managers.epoch_counter import EndOfSimulation
 from src.managers.helpers.get_random_actions import get_random_actions
 from src.managers.helpers.manager_set import ManagerSet
+from multiprocessing import Pool
 
 
-class ActionPhase:
+class PhaseController:
+
+
     """
     Responsible for orchestrating the action phase of the simulation. This
     is parrelelizable, such that each neuron can compute and act on its actions
@@ -54,87 +60,125 @@ class ActionPhase:
     def __init__(self, managers: ManagerSet):
         self.managers = managers
 
+    def run_setup(self) -> None:
+        self.managers.creator.spawn_initial_population()
+
+        self.managers.genomes.classify_species()
+
+        self.managers.analysis.store_simulation_stats()
+
+        self.managers.epoch_counter.iterate()
+
+        self.managers.cortex.refresh_tree()
+
     def run_action_phase(self) -> None:
         """
         :param neuron:
         :return:
         """
+        timer = self.managers.action_timer
 
         neurons = self.managers.nodes.get_all(Neuron)
 
-        # # Gather local neuron density attribute.
+        # Gather local neuron density.
+        timer.begin('local_density_calculation')
         for neuron in neurons:
-            density_input = self.managers.cortex.get_surrounding_densities(neuron)
-            pass
+            neuron.set_surroundings(
+                self.managers.cortex.get_surrounding_densities(neuron))
 
-        # Compute neuron actions TODO using genome.
-        for neuron in neurons:
-            actions = get_random_actions()
-            neuron.set_actions(actions)
+        # Compute neuron actions.
+        self.managers.genomes.update_all_actions(timer)
 
         # Remove relationships that are out of range.
+        timer.begin('prune_distal_connections')
         for neuron in neurons:
             self.managers.connections.prune_overextended_relationships(neuron)
 
         # TODO Temporary - belongs in learning phase.
+        timer.begin('create_firing_records')
         for neuron in neurons:
             self.managers.firing.create_firing_record(neuron)
 
-        # Move neuron.
+        # Move neurons.
+        timer.begin('move_neurons')
         for neuron in neurons:
             self.managers.cortex.move_node(neuron, neuron.get_translation())
 
         # Invest in relationships.
+        timer.begin('relation_investment')
         for neuron in neurons:
             self.managers.connections.maintain_relationships(neuron)
 
         # Redistribute rewards.
+        timer.begin('reward_distribution')
         for neuron in neurons:
             self.managers.connections.distribute_rewards(neuron)
 
         # Erode relationships
+        timer.begin('relationship_erosion')
         for neuron in neurons:
             self.managers.connections.do_connection_decay(neuron)
 
         # Form connections if the neuron is willing.
+        timer.begin('form_connections')
         for neuron in neurons:
             self.managers.connections.add_new_random_connection(neuron)
 
         # Subtract basic costs from neurons.
+        timer.begin('subtract_costs')
         self.managers.costs.do_cost_subtraction()
 
         # Remove depleted neurons from the simulation.
+        timer.begin('kill_neurons')
         self.managers.costs.prune_depleted_neurons()
 
         # Breed the willing neurons.
+        timer.begin('breed_neurons')
         self.managers.creator.breed_willing_neurons(neurons)
 
         # If required, add new neurons to maintiain population.
+        timer.begin('population_maintenance')
         self.managers.creator.maintain_population()
+        timer.end()
 
-    def run_update(self) -> None:
+    def run_update(self) -> bool:
         """
         To be run after the action phase.
         Iterate neurons and update manager data structures to new neuron
         states.
         :return:
         """
+        timer = self.managers.update_timer
 
+        timer.begin('store_stats')
         self.managers.analysis.store_simulation_stats()
+        timer.end()
 
         neurons = self.managers.nodes.get_all(Neuron)
+
+        for neuron in neurons:
+            neuron.iterate()
+
+        timer.begin('speciation')
+        self.managers.genomes.classify_species()
+
+        timer.begin('build_search_tree')
+        self.managers.cortex.refresh_tree()
+        timer.end()
+
+        self.managers.cortex.refresh_sectors()
+
+        self.managers.update_timer.iterate()
+        self.managers.action_timer.iterate()
 
         try:
             self.managers.epoch_counter.iterate()
         except EndOfSimulation as e:
             self.managers.analysis.compile_figures()
-            raise e
+            print(e.__str__())
+            return False
+        return True
 
-        for neuron in neurons:
-            neuron.iterate()
-
-        self.managers.genomes.classify_species()
-        self.managers.cortex.refresh_tree()
 
 
 
